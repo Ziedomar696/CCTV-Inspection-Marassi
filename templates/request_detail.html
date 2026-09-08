@@ -1,0 +1,19 @@
+{% extends "layout.html" %}{% block title %}{{r.request_no}}{% endblock %}{% block content %}
+<div class="card"><h1>{{r.request_no}}</h1><span class="badge">{{r.status}}</span>
+<div class="grid2" style="margin-top:15px">
+<div class="card"><b>بيانات مقدم الطلب</b><p>الاسم: {{r.requester_name}}</p><p>الصفة: {{r.affiliation}}</p><p>الموبايل: {{r.mobile or '-'}}</p></div>
+<div class="card"><b>تفاصيل الحدث</b><p>التاريخ: {{r.request_date}}</p><p>التوقيت: {{r.event_time or '-'}}</p><p>المكان: {{r.event_location or '-'}}</p><p>الأولوية: {{r.priority}}</p></div>
+<div class="card full"><b>بيان الحدث</b><p>{{r.event_description}}</p><b>المواصفات</b><p>{{r.specifications or '-'}}</p></div></div>
+<div class="actions no-print"><a class="btn gray" target="_blank" href="{{url_for('print_request',rid=r.id)}}">طباعة / PDF</a></div>
+{% if me.role=='cctv' and r.status=='New Request' %}<form method="post" action="{{url_for('start',rid=r.id)}}" class="actions"><button class="btn" type="submit">🎥 بدء فحص الكاميرات</button></form>{% endif %}
+{% if me.role=='cctv' and r.status=='Under CCTV Review' %}<div class="card"><h2>نتيجة فحص CCTV</h2><form method="post" enctype="multipart/form-data" action="{{url_for('complete',rid=r.id)}}"><div class="grid2">
+<div class="field"><label>نتيجة الفحص</label><select name="cctv_result" required><option>تم العثور على الحدث</option><option>لم يتم العثور على الحدث</option><option>الفيديو غير متاح</option><option>الكاميرا غير واضحة</option></select></div>
+<div class="field"><label>الكاميرات التي تمت مراجعتها</label><input name="cameras_checked" placeholder="CAM-01, CAM-02..." required></div>
+<div class="field"><label>بداية الفترة التي تم البحث فيها</label><input type="datetime-local" name="footage_start"></div>
+<div class="field"><label>نهاية الفترة التي تم البحث فيها</label><input type="datetime-local" name="footage_end"></div>
+<div class="field full"><label>ملاحظات CCTV</label><textarea name="cctv_notes" placeholder="وصف ما تم مشاهدته بالتفصيل"></textarea></div>
+<div class="field full"><label>إرفاق Screenshot / ملف مرجعي</label><input type="file" name="attachment" accept=".jpg,.jpeg,.png,.webp,.pdf"></div>
+</div><div class="actions"><button class="btn green" type="submit">إنهاء فحص CCTV</button></div></form></div>{% endif %}
+{% if r.cctv_result %}<div class="card"><h2>نتيجة فحص الكاميرات</h2><div class="grid2"><div><b>النتيجة:</b> {{r.cctv_result}}</div><div><b>الكاميرات:</b> {{r.cameras_checked}}</div><div><b>فترة البحث:</b> {{r.footage_start or '-'}} → {{r.footage_end or '-'}}</div><div><b>بداية/نهاية المراجعة:</b> {{r.review_start or '-'}} → {{r.review_end or '-'}}</div><div class="full"><b>ملاحظات:</b><p>{{r.cctv_notes or '-'}}</p></div>{% if r.attachment %}<div><a class="btn gray" target="_blank" href="{{url_for('uploads',name=r.attachment)}}">فتح المرفق</a></div>{% endif %}</div></div>{% endif %}
+{% if me.role=='admin' and r.status=='Review Completed' %}<div class="card"><h2>إغلاق الطلب</h2><form method="post" action="{{url_for('close',rid=r.id)}}"><div class="field"><label>توقيع المستلم / اسم المستلم</label><input name="recipient_signature"></div><div class="actions"><button class="btn green">إغلاق الطلب</button></div></form><form method="post" action="{{url_for('reject',rid=r.id)}}" class="actions"><input name="note" placeholder="سبب الرفض"><button class="btn red">رفض</button></form></div>{% endif %}
+<div class="card"><h2>Audit Trail</h2><div class="timeline">{% for x in h %}<div class="item"><b>{{x.new_status}}</b><br><span class="muted">{{x.changed_at}} — {{x.username}}</span>{% if x.note %}<p>{{x.note}}</p>{% endif %}</div>{% endfor %}</div></div></div>{% endblock %}
