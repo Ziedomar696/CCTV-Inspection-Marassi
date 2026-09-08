@@ -1,6 +1,0 @@
-{% extends "layout.html" %}{% block title %}التقارير{% endblock %}{% block content %}
-<div class="card"><h1>Administration — Reports & Analytics</h1><p class="muted">ملخص تشغيلي للطلبات، الحالات، الصفات، الأولويات والأماكن.</p></div>
-<div class="grid2"><div class="card"><h2>حسب الحالة</h2><table><tr><th>الحالة</th><th>العدد</th></tr>{% for x in by_status %}<tr><td>{{x.status}}</td><td>{{x.count}}</td></tr>{% endfor %}</table></div>
-<div class="card"><h2>حسب الأولوية</h2><table><tr><th>الأولوية</th><th>العدد</th></tr>{% for x in by_priority %}<tr><td>{{x.priority}}</td><td>{{x.count}}</td></tr>{% endfor %}</table></div>
-<div class="card"><h2>حسب الصفة</h2><table><tr><th>الصفة</th><th>العدد</th></tr>{% for x in by_aff %}<tr><td>{{x.affiliation}}</td><td>{{x.count}}</td></tr>{% endfor %}</table></div>
-<div class="card"><h2>أكثر أماكن الأحداث</h2><table><tr><th>المكان</th><th>العدد</th></tr>{% for x in by_loc %}<tr><td>{{x.location}}</td><td>{{x.count}}</td></tr>{% endfor %}</table></div></div>{% endblock %}
