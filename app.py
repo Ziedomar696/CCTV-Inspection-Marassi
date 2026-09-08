@@ -99,6 +99,27 @@ def init_db():
 
 c.commit()
 c.close()
+    hashed_password = generate_password_hash(p)
+
+    c.execute(
+        "SELECT id FROM users WHERE username=?",
+        (u,)
+    )
+    existing = c.fetchone()
+
+    if existing:
+        c.execute(
+            "UPDATE users SET password=?, role=?, active=1 WHERE username=?",
+            (hashed_password, r, u)
+        )
+    else:
+        c.execute(
+            "INSERT INTO users(username,password,role,active,created_at) VALUES(?,?,?,?,?)",
+            (u, hashed_password, r, 1, now())
+        )
+
+c.commit()
+c.close()
 
 def ensure_columns():
     c=db(); cols={r["name"] for r in c.execute("PRAGMA table_info(requests)").fetchall()}
