@@ -1,0 +1,232 @@
+{% extends "layout.html" %}{% block title %}طلب فحص كاميرات{% endblock %}{% block content %}
+<div class="card"><h1>طلب فحص كاميرات 2026</h1><p class="muted">النموذج الإلكتروني المطور عن الطلب الورقي.</p>
+
+<div class="voice-box" id="voiceBox">
+  <div class="voice-head">
+    <div>
+      <strong>🎙️ الإملاء الصوتي بالعربي</strong>
+      <div class="muted">اتكلم بشكل طبيعي، والنظام يحاول تعبئة بيانات الطلب تلقائيًا.</div>
+    </div>
+    <button class="btn voice-btn" id="voiceBtn" type="button">🎙️ ابدأ الإملاء</button>
+  </div>
+  <div class="voice-status" id="voiceStatus">جاهز للاستماع</div>
+  <div class="voice-preview" id="voicePreview">مثال: «التاريخ اليوم، الاسم أحمد محمد، الصفة مستأجر، رقم الوحدة 204، الشركة Maintenance، الموبايل 01012345678، الساعة 8 مساءً، المكان مارينا 2، الأولوية عالية، حصلت مشكلة عند البوابة، والمواصفات شخص يرتدي تي شيرت أسود»</div>
+  <div class="voice-help">بعد الإملاء راجع البيانات قبل الضغط على «إرسال الطلب». لا يتم إرسال الطلب أو التسجيل تلقائيًا.</div>
+</div>
+
+<form method="post" id="requestForm"><input type="hidden" name="csrf_token" value="{{csrf_token()}}"><div class="grid2">
+<div class="field"><label>التاريخ</label><input id="request_date" type="date" name="request_date" value="{{data.get('request_date','')}}" required></div>
+<div class="field"><label>الاسم</label><input id="requester_name" name="requester_name" value="{{data.get('requester_name','')}}" required></div>
+<div class="field"><label>رقم الوحدة</label><input id="unit_no" name="unit_no" value="{{data.get('unit_no','')}}" placeholder="اختياري"></div>
+<div class="field"><label>تبعية الموظف / الشركة</label><input id="employee_affiliation" name="employee_affiliation" value="{{data.get('employee_affiliation','')}}" placeholder="مثال: Security / Maintenance / Contractor"></div>
+<div class="field"><label>الصفة</label><select id="affiliation" name="affiliation" required><option value="">اختر</option>{% for x in ['مالك','مستأجر','صيف','زائر','شركة','أخرى'] %}<option {{'selected' if data.get('affiliation')==x else ''}}>{{x}}</option>{% endfor %}</select></div>
+<div class="field"><label>رقم الموبايل</label><input id="mobile" name="mobile" value="{{data.get('mobile','')}}"></div>
+<div class="field"><label>التوقيت</label><input id="event_time" type="time" name="event_time" value="{{data.get('event_time','')}}"></div>
+<div class="field"><label>الأولوية</label><select id="priority" name="priority"><option {{'selected' if data.get('priority')=='Low' else ''}}>Low</option><option {{'selected' if data.get('priority','Normal')=='Normal' else ''}}>Normal</option><option {{'selected' if data.get('priority')=='High' else ''}}>High</option><option {{'selected' if data.get('priority')=='Urgent' else ''}}>Urgent</option></select></div>
+<div class="field full"><label>بيان الحدث</label><textarea id="event_description" name="event_description" required>{{data.get('event_description','')}}</textarea></div>
+<div class="field"><label>مكان الحدث</label><input id="event_location" name="event_location" value="{{data.get('event_location','')}}"></div>
+<div class="field"><label>المواصفات / وصف الشخص أو الشيء</label><textarea id="specifications" name="specifications">{{data.get('specifications','')}}</textarea></div>
+</div><div class="actions"><button class="btn" type="submit">إرسال الطلب</button><a class="btn gray" href="{{url_for('dashboard')}}">إلغاء</a></div></form></div>
+
+<style>
+.voice-box{margin:0 0 22px;padding:18px;border:1px solid #dbe3ea;border-radius:16px;background:#f7fafc}
+.voice-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.voice-btn{white-space:nowrap}
+.voice-btn.listening{background:#b42318!important;animation:pulse 1.2s infinite}
+.voice-status{margin-top:12px;font-weight:700}
+.voice-status.error{color:#b42318}.voice-status.ok{color:#087443}
+.voice-preview{margin-top:10px;padding:12px;background:#fff;border-radius:10px;line-height:1.8;min-height:44px}
+.voice-help{font-size:13px;color:#667085;margin-top:8px}
+@keyframes pulse{50%{opacity:.65}}
+@media(max-width:700px){.voice-head{align-items:stretch;flex-direction:column}.voice-btn{width:100%}}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('voiceBtn');
+  const status = document.getElementById('voiceStatus');
+  const preview = document.getElementById('voicePreview');
+  const form = document.getElementById('requestForm');
+
+  if (!SpeechRecognition) {
+    btn.disabled = true;
+    btn.textContent = '🎙️ غير مدعوم في المتصفح';
+    status.textContent = 'استخدم Google Chrome أو Microsoft Edge لتفعيل الإملاء الصوتي بالعربي.';
+    status.className = 'voice-status error';
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'ar-EG';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  let finalText = '';
+  let manuallyStopped = false;
+
+  const fields = {
+    date: document.getElementById('request_date'),
+    name: document.getElementById('requester_name'),
+    unit: document.getElementById('unit_no'),
+    employee: document.getElementById('employee_affiliation'),
+    affiliation: document.getElementById('affiliation'),
+    mobile: document.getElementById('mobile'),
+    time: document.getElementById('event_time'),
+    priority: document.getElementById('priority'),
+    description: document.getElementById('event_description'),
+    location: document.getElementById('event_location'),
+    specs: document.getElementById('specifications')
+  };
+
+  function normalize(s) {
+    return (s || '').replace(/[إأآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[،؛]/g, ',').replace(/\s+/g, ' ').trim();
+  }
+
+  function cleanValue(v) {
+    return (v || '').replace(/^\s*[:：-]\s*/, '').replace(/[،,؛.]\s*$/, '').trim();
+  }
+
+  function capture(text, labels) {
+    const labelPattern = labels.join('|');
+    const re = new RegExp('(?:^|[،,؛.]|\\s)(?:' + labelPattern + ')\\s*(?:هو|هي|:|،|,)??\\s*', 'i');
+    const m = re.exec(text);
+    if (!m) return '';
+    const rest = text.slice(m.index + m[0].length);
+    const stop = /\s+(?:التاريخ|الاسم|اسم|رقم الوحدة|الوحده|تبعيه الموظف|تبعية الموظف|الشركة|الصفة|الموبايل|رقم الموبايل|التليفون|التوقيت|الوقت|الساعة|الأولوية|الاولويه|بيان الحدث|الحدث|مكان الحدث|المكان|المواصفات|وصف الشخص|وصف الشيء)\s*(?::|،|,|هو|هي)?/i.exec(rest);
+    return cleanValue(stop ? rest.slice(0, stop.index) : rest);
+  }
+
+  function parseDate(text) {
+    const t = normalize(text);
+    const now = new Date();
+    if (/\bاليوم\b/.test(t)) return now.toISOString().slice(0,10);
+    if (/\bامبارح\b|\bامس\b/.test(t)) { now.setDate(now.getDate()-1); return now.toISOString().slice(0,10); }
+    let m = t.match(/(?:التاريخ|بتاريخ)\s*(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/i);
+    if (m) { let y = m[3] ? Number(m[3]) : now.getFullYear(); if (y < 100) y += 2000; return `${y}-${String(Number(m[2])).padStart(2,'0')}-${String(Number(m[1])).padStart(2,'0')}`; }
+    return '';
+  }
+
+  function parseTime(text) {
+    const t = normalize(text);
+    let m = t.match(/(?:الساعة|وقت الحدث|التوقيت|الوقت)\s*(\d{1,2})(?:\s*(?:و|:|\.)\s*(\d{1,2}))?\s*(صباحا|مساءا|صباح|مساء)?/i);
+    if (!m) return '';
+    let h = Number(m[1]); const min = Number(m[2] || 0); const period = (m[3] || '').toLowerCase();
+    if (/مساء/.test(period) && h < 12) h += 12;
+    if (/صباح/.test(period) && h === 12) h = 0;
+    if (h > 23 || min > 59) return '';
+    return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+  }
+
+  function parsePhone(text) {
+    const m = text.match(/(?:رقم الموبايل|الموبايل|رقم التليفون|التليفون|الهاتف)\s*(?:هو|:)?\s*([0-9٠-٩+\- ]{8,})/i);
+    if (!m) return '';
+    return m[1].replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g,'').replace(/-/g,'');
+  }
+
+  function parse(text) {
+    const n = normalize(text);
+    if (!fields.date.value) fields.date.value = parseDate(n) || fields.date.value;
+    const name = capture(n, ['الاسم','اسم العميل','اسم الشخص']); if (name) fields.name.value = name;
+    const unit = capture(n, ['رقم الوحدة','رقم الوحده','الوحدة','الوحده']); if (unit) fields.unit.value = unit.replace(/[^0-9A-Za-zأ-ي -]/g,'').trim();
+    const emp = capture(n, ['تبعية الموظف','تبعيه الموظف','الشركة','اسم الشركة','جهة العمل','الجهه']); if (emp) fields.employee.value = emp;
+    const aff = capture(n, ['الصفة','صفته','صفة']);
+    if (aff) {
+      const a = normalize(aff);
+      if (/مالك/.test(a)) fields.affiliation.value='مالك';
+      else if (/مستاجر/.test(a)) fields.affiliation.value='مستأجر';
+      else if (/صيف/.test(a)) fields.affiliation.value='صيف';
+      else if (/زائر/.test(a)) fields.affiliation.value='زائر';
+      else if (/شركه/.test(a)) fields.affiliation.value='شركة';
+      else if (/اخرى|أخرى/.test(a)) fields.affiliation.value='أخرى';
+    }
+    const phone = parsePhone(n); if (phone) fields.mobile.value = phone;
+    const time = parseTime(n); if (time) fields.time.value = time;
+    const pr = n.match(/(?:الأولوية|الاولويه|الأولوية تكون)\s*(?:هي|:)?\s*(منخفضة|منخفض|عادية|عادي|طبيعية|متوسطة|متوسط|عاليه|عالية|عالي|عاجلة|عاجل|Low|Normal|High|Urgent)/i);
+    if (pr) {
+      const p=normalize(pr[1]).toLowerCase();
+      if (/منخفض/.test(p) || p==='low') fields.priority.value='Low';
+      else if (/عادي|طبيعي|متوسط|normal/.test(p)) fields.priority.value='Normal';
+      else if (/عالي|high/.test(p)) fields.priority.value='High';
+      else if (/عاجل|urgent/.test(p)) fields.priority.value='Urgent';
+    }
+    const loc = capture(n, ['مكان الحدث','المكان','الموقع']); if (loc) fields.location.value = loc;
+    const desc = capture(n, ['بيان الحدث','الحدث','تفاصيل الحدث','وصف الحدث']); if (desc) fields.description.value = desc;
+    const specs = capture(n, ['المواصفات','وصف الشخص','وصف الشيء','مواصفات الشخص','مواصفات الشيء']); if (specs) fields.specs.value = specs;
+
+    // If the user spoke a natural sentence without explicit labels, keep the full transcript
+    // in the event description rather than losing useful information.
+    if (!fields.description.value && n) fields.description.value = n;
+  }
+
+  function updatePreview(interim='') {
+    const all = (finalText + ' ' + interim).trim();
+    preview.textContent = all || 'ابدأ الكلام الآن...';
+  }
+
+  recognition.onstart = function () {
+    manuallyStopped = false;
+    btn.classList.add('listening');
+    btn.textContent = '⏹️ إيقاف الإملاء';
+    status.className = 'voice-status';
+    status.textContent = '🔴 يستمع الآن... اتكلم بالعربي';
+  };
+
+  recognition.onresult = function (event) {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += transcript + ' ';
+      else interim += transcript;
+    }
+    updatePreview(interim);
+    if (finalText) parse(finalText);
+  };
+
+  recognition.onerror = function (event) {
+    const messages = {
+      'not-allowed':'المتصفح لم يسمح باستخدام الميكروفون. اسمح بالوصول للميكروفون ثم جرّب مرة أخرى.',
+      'service-not-allowed':'خدمة التعرف على الكلام غير متاحة في هذا المتصفح.',
+      'no-speech':'لم يتم التقاط كلام واضح. حاول مرة أخرى.',
+      'audio-capture':'لم يتم العثور على ميكروفون متاح.'
+    };
+    status.textContent = messages[event.error] || ('حدث خطأ في الإملاء الصوتي: ' + event.error);
+    status.className = 'voice-status error';
+    btn.classList.remove('listening');
+    btn.textContent = '🎙️ ابدأ الإملاء';
+  };
+
+  recognition.onend = function () {
+    btn.classList.remove('listening');
+    btn.textContent = '🎙️ ابدأ الإملاء';
+    if (finalText) {
+      parse(finalText);
+      status.textContent = '✓ تم تحويل الكلام وتعبئة الحقول. راجع البيانات قبل الإرسال.';
+      status.className = 'voice-status ok';
+    } else if (!manuallyStopped) {
+      status.textContent = 'لم يتم التقاط نص. اضغط ابدأ الإملاء وحاول مرة أخرى.';
+    }
+  };
+
+  btn.addEventListener('click', function () {
+    if (btn.classList.contains('listening')) {
+      manuallyStopped = true;
+      recognition.stop();
+      return;
+    }
+    finalText = '';
+    preview.textContent = 'ابدأ الكلام الآن...';
+    try { recognition.start(); } catch (e) {}
+  });
+
+  form.addEventListener('submit', function () {
+    if (!fields.date.value) {
+      fields.date.value = new Date().toISOString().slice(0,10);
+    }
+  });
+})();
+</script>
+{% endblock %}
